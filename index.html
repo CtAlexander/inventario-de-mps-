@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventario de Materias Primas</title>
+  <style>
+    body {
+      font-family: "Roboto", sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+
+    header {
+      background-color: #00264d;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    form label {
+      font-size: 1rem;
+      font-weight: bold;
+    }
+
+    form input {
+      padding: 12px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    form button {
+      padding: 12px 20px;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #fff;
+      background-color: #0056b3;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    form button:hover {
+      background-color: #003f88;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin-top: 20px;
+    }
+
+    ul li {
+      padding: 15px;
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    ul li div {
+      margin-bottom: 10px;
+    }
+
+    ul li button {
+      padding: 8px 15px;
+      font-size: 0.9rem;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    ul li button.descontar {
+      background-color: #00796b;
+    }
+
+    ul li button.descontar:hover {
+      background-color: #005b4f;
+    }
+
+    ul li button.eliminar {
+      background-color: #e63946;
+    }
+
+    ul li button.eliminar:hover {
+      background-color: #d62839;
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAPxRQsj4rasfknf6fdAbyyHoQD1CP7pAM",
+      authDomain: "materia-primas.firebaseapp.com",
+      databaseURL: "https://materia-primas-default-rtdb.firebaseio.com",
+      projectId: "materia-primas",
+      storageBucket: "materia-primas.firebasestorage.app",
+      messagingSenderId: "706637592713",
+      appId: "1:706637592713:web:75479821eaf0040555ee58",
+      measurementId: "G-WZJCVN58PH"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    const formularioInventario = document.getElementById("formularioInventario");
+    const listaInventario = document.getElementById("listaInventario");
+
+    formularioInventario.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const material = document.getElementById("material").value;
+      const cantidadLlego = parseInt(document.getElementById("cantidadLlego").value);
+      const lote = document.getElementById("lote").value;
+      const recibidoPor = document.getElementById("recibidoPor").value;
+
+      const referencia = ref(database, "inventario/");
+      push(referencia, {
+        material,
+        cantidadLlego,
+        cantidadDisponible: cantidadLlego,
+        lote,
+        recibidoPor,
+        historial: [],
+        timestamp: Date.now(),
+      });
+
+      formularioInventario.reset();
+    });
+
+    const referenciaInventario = ref(database, "inventario/");
+    onValue(referenciaInventario, (snapshot) => {
+      listaInventario.innerHTML = "";
+      snapshot.forEach((childSnapshot) => {
+        const id = childSnapshot.key;
+        const data = childSnapshot.val();
+        const historialHTML = (data.historial || []).map(
+          (registro) =>
+            `<div>- ${registro.fecha}: ${registro.solicitante} (${registro.cantidad} unidades)</div>`
+        ).join("");
+
+        const elemento = document.createElement("li");
+        elemento.innerHTML = `
+          <div>
+            <strong>Material:</strong> ${data.material} <br>
+            <strong>Cantidad Disponible:</strong> ${data.cantidadDisponible} <br>
+            <strong>Lote:</strong> ${data.lote} <br>
+            <strong>Recibido Por:</strong> ${data.recibidoPor}
+          </div>
+          <div>
+            <strong>Historial de Uso:</strong>
+            ${historialHTML || "No se ha utilizado aún."}
+          </div>
+          <div>
+            <button class="descontar" onclick="descontar('${id}', ${data.cantidadDisponible}, ${JSON.stringify(data.historial || [])})">Descontar</button>
+            <button class="eliminar" onclick="eliminar('${id}')">Eliminar</button>
+          </div>
+        `;
+
+        listaInventario.appendChild(elemento);
+      });
+    });
+
+    window.eliminar = (id) => {
+      const referencia = ref(database, `inventario/${id}`);
+      remove(referencia);
+    };
+
+    window.descontar = (id, cantidadActual, historialActual) => {
+      const cantidadDescontar = parseInt(prompt("Ingresa la cantidad a descontar:"));
+      if (cantidadDescontar > 0 && cantidadDescontar <= cantidadActual) {
+        const solicitante = prompt("Ingresa el nombre del solicitante:");
+        if (!solicitante) {
+          alert("Debes ingresar el nombre del solicitante.");
+          return;
+        }
+        const nuevaCantidad = cantidadActual - cantidadDescontar;
+        const fecha = new Date().toLocaleString();
+
+        const referencia = ref(database, `inventario/${id}`);
+        const historial = [...historialActual, { solicitante, cantidad: cantidadDescontar, fecha }];
+        update(referencia, {
+          cantidadDisponible: nuevaCantidad,
+          historial
+        });
+        alert(`Se descontaron ${cantidadDescontar}. Cantidad restante: ${nuevaCantidad}`);
+      } else {
+        alert("Cantidad inválida.");
+      }
+    };
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Inventario de Materias Primas</h1>
+  </header>
+  <main>
+    <form id="formularioInventario">
+      <label for="material">Nombre del Material:</label>
+      <input type="text" id="material" name="material" required>
+
+      <label for="cantidadLlego">Cantidad que Llegó:</label>
+      <input type="number" id="cantidadLlego" name="cantidadLlego" required>
+
+      <label for="lote">Lote en que se Ocupó:</label>
+      <input type="text" id="lote" name="lote" required>
+
+      <label for="recibidoPor">Recibido Por:</label>
+      <input type="text" id="recibidoPor" name="recibidoPor" required>
+
+      <button type="submit">Registrar en Inventario</button>
+    </form>
+
+    <ul id="listaInventario"></ul>
+  </main>
+</body>
+</html>
