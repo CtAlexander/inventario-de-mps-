@@ -173,6 +173,7 @@
         elemento.innerHTML = `
           <div>
             <strong>Material:</strong> ${data.material} <br>
+            <strong>Cantidad que Llegó:</strong> ${data.cantidadLlego} <br>
             <strong>Cantidad Disponible:</strong> ${data.cantidadDisponible} <br>
             <strong>Lote:</strong> ${data.lote} <br>
             <strong>Recibido Por:</strong> ${data.recibidoPor}
@@ -183,7 +184,7 @@
           </div>
           <div>
             <button class="descontar" onclick="descontar('${id}', ${data.cantidadDisponible}, ${JSON.stringify(data.historial || [])})">Descontar</button>
-            <button class="eliminar" onclick="eliminar('${id}')">Eliminar</button>
+            <button class="eliminar" onclick="eliminar('${id}', this.closest('li'))">Eliminar</button>
           </div>
         `;
 
@@ -191,9 +192,14 @@
       });
     });
 
-    window.eliminar = (id) => {
+    window.eliminar = (id, elemento) => {
       const referencia = ref(database, `inventario/${id}`);
-      remove(referencia);
+      remove(referencia).then(() => {
+        // Eliminar del DOM
+        elemento.remove();
+      }).catch((error) => {
+        alert("Error al eliminar el registro: " + error.message);
+      });
     };
 
     window.descontar = (id, cantidadActual, historialActual) => {
