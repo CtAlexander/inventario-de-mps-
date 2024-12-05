@@ -156,8 +156,7 @@
 #exportarPDF:hover {
   background-color: #005b4f;
 }
-
-  </style>
+ </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -228,12 +227,22 @@
             ${historialHTML || "No se ha utilizado aún."}
           </div>
           <div>
-            <button class="descontar" onclick="descontar('${id}', ${data.cantidadDisponible}, ${JSON.stringify(data.historial || [])})">Descontar</button>
+            <button class="descontar" data-id="${id}" data-cantidad="${data.cantidadDisponible}" data-historial='${JSON.stringify(data.historial || [])}'>Descontar</button>
             <button class="eliminar" onclick="eliminar('${id}', this.closest('li'))">Eliminar</button>
           </div>
         `;
 
         listaInventario.appendChild(elemento);
+      });
+
+      // Agregar eventos de clic para los botones de descontar
+      document.querySelectorAll(".descontar").forEach((boton) => {
+        boton.addEventListener("click", () => {
+          const id = boton.getAttribute("data-id");
+          const cantidadDisponible = parseInt(boton.getAttribute("data-cantidad"));
+          const historial = JSON.parse(boton.getAttribute("data-historial"));
+          descontar(id, cantidadDisponible, historial);
+        });
       });
     });
 
@@ -248,25 +257,36 @@
 
     window.descontar = (id, cantidadActual, historialActual) => {
       const cantidadDescontar = parseInt(prompt("Ingresa la cantidad a descontar:"));
-      if (cantidadDescontar > 0 && cantidadDescontar <= cantidadActual) {
-        const solicitante = prompt("Ingresa el nombre del solicitante:");
-        if (!solicitante) {
-          alert("Debes ingresar el nombre del solicitante.");
-          return;
-        }
-        const nuevaCantidad = cantidadActual - cantidadDescontar;
-        const fecha = new Date().toLocaleString();
 
-        const referencia = ref(database, `inventario/${id}`);
-        const historial = [...historialActual, { solicitante, cantidad: cantidadDescontar, fecha }];
-        update(referencia, {
-          cantidadDisponible: nuevaCantidad,
-          historial
-        });
-        alert(`Se descontaron ${cantidadDescontar}. Cantidad restante: ${nuevaCantidad}`);
-      } else {
+      if (isNaN(cantidadDescontar) || cantidadDescontar <= 0) {
         alert("Cantidad inválida.");
+        return;
       }
+
+      if (cantidadDescontar > cantidadActual) {
+        alert("No puedes descontar más de la cantidad disponible.");
+        return;
+      }
+
+      const solicitante = prompt("Ingresa el nombre del solicitante:");
+      if (!solicitante) {
+        alert("Debes ingresar el nombre del solicitante.");
+        return;
+      }
+
+      const nuevaCantidad = cantidadActual - cantidadDescontar;
+      const fecha = new Date().toLocaleString();
+
+      const referencia = ref(database, `inventario/${id}`);
+      const historial = [...historialActual, { solicitante, cantidad: cantidadDescontar, fecha }];
+      update(referencia, {
+        cantidadDisponible: nuevaCantidad,
+        historial,
+      }).then(() => {
+        alert(`Se descontaron ${cantidadDescontar}. Cantidad restante: ${nuevaCantidad}`);
+      }).catch((error) => {
+        alert("Error al actualizar los datos: " + error.message);
+      });
     };
 
     botonExportarPDF.addEventListener("click", () => {
@@ -274,11 +294,7 @@
       const pdf = new jsPDF();
 
       const fecha = new Date();
-      const meses = [
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-      ];
-      const marcaAgua = `Descargado en ${meses[fecha.getMonth()]}`;
+      const marcaAgua = `Descargado el ${fecha.toLocaleDateString()}`;
 
       pdf.setFontSize(50);
       pdf.setTextColor(200, 200, 200);
@@ -326,12 +342,9 @@ Recibido Por: ${data.recibidoPor}
 
       <button type="submit">Registrar en Inventario</button>
     </form>
- <a href="https://ctalexander.github.io/ACEITES-Y-LIPIDOS-BD-/" class="boton-regresar">Regresar a la Plataforma</a>
-
+    <a href="https://ctalexander.github.io/ACEITES-Y-LIPIDOS-BD-/" class="boton-regresar">Regresar a la Plataforma</a>
     <button id="exportarPDF">Exportar a PDF</button>
     <ul id="listaInventario"></ul>
-
   </main>
-
 </body>
 </html>
